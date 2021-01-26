@@ -1,0 +1,583 @@
+---
+title: "CovidSurg Analysis"
+author: "Laura Bravo Merodio"
+output: 
+  html_document:
+    #theme: sandstone
+    theme: lumen
+    #code_folding: "hide"
+    number_sections: TRUE
+    toc: true
+    toc_float:
+        collapsed: true
+        smooth_scroll: true
+    toc_depth: 3
+    fig_caption: yes
+    code_folding: show
+
+fontsize: 14pt
+---
+
+```{r setup, include=FALSE}
+
+#knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+
+```
+
+
+# Introduction
+
+This is a report that summarizes the main results from the research, including plots and tables. It is set so as to mimic the analysis pipeline undergone in the paper *****, where slurm was used and so no reproducibility could be performed. For more information please go to: 
+
+https://globalsurg.org/covidsurg/#Anchor-URL-link
+
+and check our shiny webb app to use our model for COVID-19 patients undergoing surgery. 
+
+https://inflam.shinyapps.io/CovidSugRiskApp/#Anchor-URL-link
+
+***
+***
+
+# Set-up and libraries
+
+```{r}
+
+#install.packages("flextable")
+library(flextable)
+library(knitr)
+#install.packages("cowplot")
+library(ggplot2)
+library(grid)
+library(cowplot)
+library(dplyr)
+#install.packages("webshot")
+#install.packages("magick")
+library(webshot)
+library(magick)
+library(officer)
+library(gridExtra)
+library(magrittr)
+library(tibble)
+#library(gtsummary); 
+library(gt); 
+library(forcats);
+library(compareGroups)
+library(tidyverse)
+library(officer)
+
+# load all targets from drake and extras
+
+#loadd(MatrixCorr)
+loadd(data2)
+loadd(PlotsNames)
+loadd(Logitplot)
+loadd(TopModels)
+loadd(AUCPlots)
+loadd(CalibrationPlots)
+loadd(hh) 
+load("ExternalParams.RData")
+
+```
+
+# Data exploration 
+
+## General information coding
+
+```{r results = 'hide'}
+
+dataA <- readd(data1)
+
+dataPercent <- dataA %>%
+  filter(age != "17-19 years")
+
+
+Info <- data.frame(table(dataPercent$redcap_data_access_group)) %>%
+  separate(Var1, into = c("Country","City","Hospital"),sep = "_")
+
+dim(Info) #Hospitals
+dim(table(Info$Country)) #Countries
+
+#filter(Info, Country == "es")
+table(dataPercent$sex, useNA = "ifany")
+table(dataPercent$agegroup, useNA = "ifany")
+table(dataPercent$time, useNA = "ifany")
+table(dataPercent$urgency4, useNA = "ifany")
+table(dataPercent$indication,  useNA = "ifany")
+table(dataPercent$spec2, useNA = "ifany")
+table(dataPercent$mortality, useNA = "ifany")
+table(dataPercent$month, useNA = "ifany")
+```
+
+## Preprocessing and table 1
+
+```{r Table, results= 'hide',include=FALSE}
+
+ dataA1Old <- dataA %>%
+    dplyr::rename(RespPreop = preop_resp) %>%
+    dplyr::rename(Label = mortality) %>%
+    dplyr::rename(FinAnas = anaesthesia) %>%
+    mutate(
+      cardiacrisk = recode(cardiacrisk,
+        "0" = "0",
+        "1" = "1",
+        "2" = "2",
+        "3" = "3",
+        "4" = "4+",
+        "5" = "4+",
+        "6" = "4+"
+      ),
+      asa3 = recode(asa4,
+        "Grades 1" = "Grade 1",
+        "Grade 2" = "Grade 2",
+        "Grade 3" = "Grade 3",
+        "Grade 4" = "Grade 4-5",
+        "Grade 5" = "Grade 4-5"
+      ),
+       age = recode(age, '20-29 years' = "<40 years",
+                   '30-39 years' = "<40 years")
+    ) %>%
+    select(-c(
+      record_id,
+      redcap_data_access_group,
+      # crp,
+      starts_with("anaes"),
+      starts_with("respsupport"),
+      agegroup,
+      asa4,
+      asa2 # ,
+      # month
+    )) %>%
+    dplyr::rename(anaesthesia = FinAnas) %>%
+    # drop_na() %>%
+    filter(age != "17-19 years")
+
+  dataA1Old$cardiacrisk <- as.factor(dataA1Old$cardiacrisk)
+  
+  dataA1Labs <- dataA1Old %>%
+    mutate(
+      spec2 = recode(spec2,
+        "Abdominal" = "Abdominal surgery",
+        "Head and neck" = "Head and neck surgery",
+        "Limb" = "Orthopaedic surgery",
+        "obstetric" = "Obstetrics",
+        "other" = "Other surgery",
+        "Thorax" = "Cardiothoracic surgery"
+      ),
+      RespPreop = recode(RespPreop,
+        "none" = "None",
+        "oxygen" = "Supplemental oxygen",
+        "ventilated" = "Ventilation"
+      ),
+      time = recode(time,
+        "Preop" = "Preoperative",
+        "Postop" = "Postoperative"
+      ),
+      indication = recode(indication, "Benign/Obs" = "Benign"),
+      grade998 = recode(grade998,
+        "major" = "Major",
+        "minor" = "Minor"
+      ), 
+      smoker = recode(smoker, 
+                      "No" = "Non-smoker", 
+                      "Yes" = "Smoker"), 
+      respdisease = recode(respdisease, 
+                      "Yes" = "Respiratory disease", 
+                      "No" = "No respiratory disease")
+    ) %>%
+    dplyr::rename(
+      Age = age,
+      Month = month,
+      Sex = sex,
+      "Grade of surgery" = grade998,
+      Anaesthesia = anaesthesia,
+      Speciality = spec2,
+      "Haemoglobin (g/dl)" = hb,
+      "White cell count (10^9/L)" = wcc,
+      "Preoperative respiratory support" = RespPreop,
+      "Indication for surgery" = indication,
+      "Urgency of surgery" = urgency4,
+      "Timing of SARS-CoV-2 diagnosis" = time,
+      "Current smoker" = smoker,
+      "Respiratory comorbidity" = respdisease,
+      "Revised Cardiac Risk Index" = cardiacrisk,
+      "ASA grade" = asa3,
+      "C-reactive protein" = crp,
+    )
+  
+  data <- dataA1Labs %>%
+    filter(Month %in% c("Feb", "Mar", "Apr", "May")) %>%
+    select(-Month)
+
+  Validation <- filter(dataA1Labs, Month %in% c("Jun", "July")) %>%
+    select(-Month)
+
+#for some reason factors with No and Yes do not work
+
+Total <- list(data, Validation) %>%
+  bind_rows(.id = "Type") %>%
+  mutate(Type =
+  recode(Type, "1" = "Derivation", 
+                 "2" = "ValidationTime")
+  ) %>%
+  mutate_at(c("Current smoker", "Respiratory comorbidity"), as.factor) %>%
+  drop_na(Label)
+  
+res <- compareGroups(Label ~ . - Type, Total, method = 4, chisq.test.perm = TRUE, chisq.test.seed = 132, simplify = TRUE, byrow = FALSE, oddsratio.method ="fisher")
+restab1<-createTable(res, hide.no = 'no')  
+restab0<-update(restab1, show.n = TRUE, show.ratio = TRUE, show.p.overall = TRUE, show.p.mul = TRUE, show.p.ratio = FALSE)
+restab2<-update(restab1, x = update(res, subset = Type == 'ValidationTime'), show.ratio = FALSE, show.p.overall = TRUE, show.p.mul = TRUE, show.p.ratio = FALSE)
+restab3<-update(restab1, x = update(res, subset = Type == 'Derivation'), show.ratio = FALSE, show.p.overall = TRUE, show.p.mul = TRUE, show.p.ratio = FALSE)
+ p <- cbind("All" = restab0, "Derivation" = restab3, "Validation" = restab2)
+
+export2word(p, file='Tab1_FinalTable.docx')
+
+
+
+```
+
+```{r Table1, fig.align="center"}
+head(p)
+```
+
+## General distribution of categorical variables
+
+```{r DistCat, fig.align="center", fig.width=12, fig.height=8}
+
+Plot1a((data2)[[1]]) + theme_bw()
+
+```
+
+# Feature Selection 
+
+```{r FeatSel1, include = FALSE, results='hide'}
+
+#this grid.arrange generates output!!!
+
+
+  
+  Plot1 <- grid.arrange(
+  PlotsNames[[2]] + 
+    theme(text = element_text(size=9)), 
+  PlotsNames[[4]] + 
+    theme(text = element_text(size=10)),
+  #Plots[[4]] + 
+  #  theme(text = element_text(size=10)),
+  #ncol = 3, 
+  ncol = 2,
+  top = "Variable Importance", 
+  #widths = c(0.7, 1,0.8)
+  widths = c(0.6, 1)
+)
+
+
+
+ft_raster <- PlotsNames[[1]] %>% 
+  flextable() %>% autofit() %>% add_header_lines("Feature Ranking") %>% 
+  as_raster()
+
+gg2 <- ggplot() + 
+  theme_void() + 
+  annotation_custom(rasterGrob(ft_raster), xmin=-Inf, xmax=Inf, ymin=-Inf, ymax=Inf)
+
+pdf("Fig2_FeatureSelection.pdf",12,7)
+cowplot::plot_grid(Plot1, gg2, nrow = 2, ncol = 1, rel_heights = c(4, 2), labels = c('A', 'B'))
+dev.off()
+
+
+```
+
+```{r FeatSel, fig.align="center", fig.width=12, fig.height=14, fig.cap="Figure 2: Feature Selection A. Importance ranking RF and EN. B. Top ranking features "}
+
+cowplot::plot_grid(Plot1, gg2, nrow = 2, ncol = 1, rel_heights = c(4, 2), labels = c('A', 'B'))
+
+```
+
+
+# Model building
+
+```{r include = F}
+
+load("TrainingTest.RData")
+load("FeatureSelect2.RData")
+
+Size <- 12
+#Bootstraps carried on
+
+All <- MergeOut %>%
+  mutate(Model=
+           recode(Model, "dt" = "Decision Trees", 
+                  "rf" = "Random Forest", 
+                  "logit" = "Logistic Regression")) %>%
+  #filter(.metric == "roc_auc") %>%
+  ggplot(aes(
+    x = Run,
+    y = Mean,
+    col = Model,
+    shape = Type
+  )) +
+  geom_pointrange(aes(ymin = Mean - sd, ymax = Mean + sd),
+                  position = position_dodge(width = 0.8),
+                  size = 0.4) +
+  facet_grid(Metrics ~ ., scales = "free") +
+  scale_y_continuous(
+    labels = scales::percent,
+    breaks = seq(0, 10, 0.05),
+    expand = c(0, 0)
+  ) +
+  scale_x_continuous(breaks = seq(0, max(MergeOut$Run) + 2, 2), expand = c(0, 0)) +
+  labs(title = paste0("Bootstraps n=", Bootstraps)) +
+  theme(text = element_text(size = Size)) + theme(
+    plot.title = element_text(size = Size, face = "bold"),
+    #legend.title = element_text(Size),
+    legend.text = element_text(size = Size),
+    strip.text = element_text(size = Size),
+    panel.spacing = unit(3, "lines")
+  ) + theme_bw()
+
+
+q3 <- MergeOut %>%
+  filter(Type == "Test", Metrics == "AUROC") %>%
+  select(-c(.metric, Type, ModelFinal)) %>%
+  arrange(desc(Mean)) %>%
+  mutate_if(is.numeric, ~ round(., 3))
+
+IPP <- inner_join(q3, Variables)
+
+pp <- IPP %>%
+  #head(20) %>% #nooooo for the whole table
+  #arrange(desc(-Run)) %>%
+  mutate(Model=
+           recode(Model, "dt" = "Decision Trees", 
+                  "rf" = "Random Forest", 
+                  "logit" = "Logistic Regression")) %>%
+  rename("Standard Deviation" = "sd", 
+         #"Number of Variables" = "NumVars", 
+         "Mean AUC" = "Mean"
+  ) %>%
+  select(-Metrics) 
+
+pp$Names <- pp$Names %>%
+  str_replace_all(
+    c("\"" = "", 
+      c("\"" = ""))
+  )
+
+l <- Tablize(pp)
+
+pdf("STab2_AllModelsAllRank.pdf", 10,8)
+plot(l)
+dev.off()
+
+
+pdf("Fig3A_Model.pdf",18,10)
+cowplot::plot_grid(All, NULL, Logitplot, ncol = 1, nrow = 3, rel_heights = c(1.2,0.05, 2), rel_widths  = c(2, 1) )
+dev.off()
+```
+
+```{r ModelBuild, fig.align="center", fig.width=10, fig.height=8, fig.cap="Figure 3: Model building"}
+
+cowplot::plot_grid(All, NULL, Logitplot, ncol = 1, nrow = 3, rel_heights = c(1.2,0.05, 2), rel_widths  = c(2, 1) )
+
+```
+
+## Model results tables
+
+```{r TablesRes, fig.align="center", fig.width=2, fig.height=1, fig.cap="Table 2"}
+
+library(readr)
+
+read_csv("Top20Models.csv") %>%
+                select(-X1) %>%
+kable(., digits = 2, format.args = list(scientific = FALSE))
+
+
+```
+
+## AUCPlots
+
+
+```{r AUCPlots, fig.align="center", fig.width=7, fig.height=7, fig.cap="Table 2"}
+
+plot(AUCPlots[[3]])
+
+```
+
+## Calibration
+
+
+```{r Calibration1,include = F}
+
+
+set.seed(132)
+
+CalibrationParams <- function(ValidationWPred) {
+  val_m1 <- val.prob(ValidationWPred$G, as.numeric(as.factor(ValidationWPred$Label)) - 1,
+                     pl = FALSE
+  ) %>% round(3)
+  return(val_m1)
+}
+
+CalibrationVals <- rbind(Validation = CalibrationParams(AUCPlots[[2]]), Derivation = CalibrationParams(AUCPlots[[1]]))
+
+CalibrationValsTable <- data.frame(CalibrationVals[,c( 11, 12,13)]) %>%
+  add_rownames()
+
+names(CalibrationValsTable)[c(1,2)] <- c("Set",  "Brier")
+
+cc <- Tablize(CalibrationValsTable)
+
+pdf("Fig5C_ParamsCalibration.pdf", 7, 5)
+plot(cc)
+dev.off()
+
+k <- Plot1Cal(AUCPlots[[2]], " ")
+
+g <- arrangeGrob(k[[1]], k[[2]], respect = TRUE, heights = c(1, 0.25), ncol = 1)
+
+Two <- Plot3Bee(AUCPlots[[2]], "Probability")
+
+ft_raster <- CalibrationValsTable %>% 
+  flextable() %>% autofit()  %>% 
+  as_raster()
+
+gg2 <- ggplot() + 
+  theme_void() + 
+  annotation_custom(rasterGrob(ft_raster), xmin=-Inf, xmax=Inf, ymin=-Inf, ymax=Inf)
+
+bottom <- cowplot::plot_grid(Two, gg2, nrow = 2, ncol = 1, rel_heights = c(2, 1), labels = c('B', 'C') )
+
+pdf("Fig5_CalibrationValidation.pdf", 7, 5)
+plot_grid(
+ g, bottom,
+   ncol = 2, align = "h", labels = c('A', '') 
+)
+dev.off()
+
+
+
+```
+
+```{r Calibration, fig.align="center", fig.width=6, fig.height=6, fig.cap="Figure 5: Calibration"}
+
+plot_grid(
+ g, bottom,
+   ncol = 2, align = "h", labels = c('A', '') 
+)
+
+```
+
+# Case fatality and probability outcome
+
+```{r FinalFig1, include = F}
+
+m <- AUCPlots[[4]]
+
+#ChosenRun <- 12  ## get it directly from data. Is it needed?
+
+xx <- data2[[1]] %>%
+  select(hh[[ChosenRun]])
+
+vars <- lapply(1:dim(xx)[2], function(x) levels(as.factor(xx[[x]])))
+
+Combination <- expand.grid(vars) %>%
+  set_names(names(xx))
+
+CombinationWPred <- EqsFun(Combination, Combination, m)
+
+#max(CombinationWPred$G) # round to 0 
+#min(CombinationWPred$G) # round to 0.8
+#hist(CombinationWPred$G)
+
+Probs <- round(c(0,0.05, 0.2, 0.5, 0.8), 2)
+
+qqVal <- MortalityTable( Probs, AUCPlots[[2]],hh) 
+qqVal %>%
+  kable(., digits = 2, format.args = list(scientific = FALSE))
+
+# this one was okay with a 0.55
+qqDerv <-  MortalityTable( Probs, AUCPlots[[1]], hh)
+qqDerv %>%
+  kable(., digits = 2, format.args = list(scientific = FALSE))
+
+write.csv(qqVal, "App-MortalityTableVal.csv")
+write.csv(qqDerv, "App-MortalityTableDerv.csv")
+
+priors2 <- data.frame(CombinationWPred) %>%
+  mutate(z =cut(G, round( Probs, 2), include.lowest = TRUE)) %>%
+  arrange(.,G) 
+#had another one with porbabilities instead of linear predictors.
+
+
+# Case fatality and Linear Predictor
+
+#xxD <- dataA1 %>%
+#  select(c(hh[[ChosenRun]]))
+
+DataWPred <- EqsFun(xx, data2[[1]], m)
+
+CaseFatalVal <- DataWPred %>% # have same cuts as before, just want to extract case fatality ratio from here
+  mutate(z = cut(G, round( Probs, 2), include.lowest = TRUE)) %>%
+  group_by(z) %>%
+  mutate(CaseFatality = length(Label[Label == "Dead"]) / (length(Label[Label == "Dead"]) + length(Label[Label == "Alive"]))) %>%
+  select(hh[[ChosenRun]], z, CaseFatality) %>% 
+  arrange(.,CaseFatality) %>%
+  mutate(Risk = paste0(z, "  - ", round(CaseFatality, 3)*100,"%"))
+  #mutate(Risk = paste0(round(CaseFatality, 3)*100,"%", z, "  - "))
+
+CaseFatalVal2 <- CaseFatalVal %>%
+  select(z, Risk) 
+
+FinalPlot <- inner_join(priors2, CaseFatalVal2) %>%
+  unique() 
+  
+FinalPlot$Risk <- as.factor(FinalPlot$Risk) 
+
+FinalPlot$Risk <-   fct_relevel(FinalPlot$Risk,levels(as.factor(FinalPlot$Risk))[4])
+
+ColoursMort <- ggplot(FinalPlot, aes(x = FinalPlot[[1]], y = FinalPlot[[2]], fill = FinalPlot[[8]])) +
+  geom_tile(color = "black", size = 0.5) +
+  # geom_text(aes(label=text), size=18) +
+  scale_fill_brewer(palette = "Set3") +
+  # scale_x_discrete(position = "top") +
+  scale_x_discrete("Age") +
+  scale_y_discrete("Asa Grade") +
+  #scale_fill_discrete(name = "Risk", labels = c("[0,0.2]", "(0.2,0.4]", "(0.4,0.6]", "(0.6,0.8]")) +
+  scale_fill_manual(values= c(  "#8FB89D", "#F1D64D", "#E8B49A", "#C57472", "#C94135")) + #"#C94135",
+  # values= c( "#b7aeae", "#c3a4a2", "#cf9a96", "#db908a" ,"#e6857f" , "#C57472", "#fe7167")) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1), panel.background = element_blank(), panel.border = element_blank(), panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(), plot.background = element_blank(),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 10, face = "bold"),
+    strip.text.x = element_text(size = 10)
+  ) +
+  facet_grid(FinalPlot[[3]] ~ FinalPlot[[4]], scales = "free" ) + #labeller = label_both
+  labs(fill = "Probability Threshold and Mortality")
+
+# do this of whole dataset - not all combinations existing
+pdf("Fig6_MortalityTables.pdf", 5,6)
+plot(add_header_lines(Tablize(qqVal[-c(3:4),]), values = "Validation", top = TRUE))
+plot(add_header_lines(Tablize(qqDerv[-c(3:4),]), values = "Derivation", top = TRUE))
+dev.off()
+
+pdf("Fig6_FinalFig.pdf", 14,12)
+print(ColoursMort)
+dev.off()
+
+```
+
+```{r FinalFigure1, fig.align="center", fig.width=13, fig.height=11, fig.cap="Figure 6: Case fatality ratio"}
+
+ColoursMort 
+
+qqVal %>%
+  kable(., digits = 2, format.args = list(scientific = FALSE))
+
+qqDerv %>%
+  kable(., digits = 2, format.args = list(scientific = FALSE))
+
+```
+
+
+
