@@ -1,8 +1,15 @@
 
-#Helloooooooooooo
+###########################################################################
+###########################################################################
+### ###
+### SECTION 1: INITIALIZATION ###
+### ###
+###########################################################################
+###########################################################################
 
-#Will have to change working directory and data locations: 130 and 173 lines.
-#Run until line 163.
+
+#Will have to add/set working directory: 26 and 203 lines.
+#Run until line 163 - uncomment after to send generated output to store on a folder. 
 #For a summary of the results check: .html report output
 
 rm(list = ls(all = TRUE))
@@ -14,8 +21,6 @@ rm(list = ls(all = TRUE))
 ########
 
 #setwd("~/Desktop/COVID2021/CovidSurg")
-
-tic()
 
 
 WorkingDir <- getwd()
@@ -34,7 +39,7 @@ z <- list(5, 50, 500)
 future_map2(x, y, ~ .x + .y)
 
 
-library(drake) # before problem with workflow now no - nio verlap of functions: so add this later
+library(drake) #loaded after, beacuse of overlapping functions 
 
 ##### function for MICE or no imputation - interchange
 source(paste0(WorkingDir,"/CovidSurgNoImputationMissingVals.R")) 
@@ -50,10 +55,17 @@ source(paste0(WorkingDir,"/CovidSurgSecondPartCoeffs.R")) # only because chosen 
 source(paste0(WorkingDir,"/CovidSurgCalibration.R"))    
 source(paste0(WorkingDir,"/CovidSurgAUC.R"))
 
-## ---------------------User Input  --------------------------------------------------------------------------------
+###########################################################################
+###########################################################################
+### ###
+### SECTION 2: USER INPUT ###
+### ###
+###########################################################################
+###########################################################################
 
-# These are the three parameteres that you can change - with this set up 5 mins computation. Also hh in 85 can be changed
-# for function FeatureSelectionUserInput - so function outside. 
+
+# These are the three parameteres (Bootstrapsm SelectedModels, ChosenRun) that you can change - with this set up 5 mins computation. Also hh in line 102 can be changed. The
+# reported analysis had the following specifications (ran in HPC - Bootstraps: 100, SelectedModels: 1,2,3, ChosenRun: 21, line 102 commented (hh) )
 
 Bootstraps <- 2
 
@@ -76,7 +88,7 @@ ChosenRun <- 12 #this is the run with the final model
 FeatureSelectionUserInput <- function(PlotsNames) {
  
    KeyFeats <- c(PlotsNames[[1]]$`Variable Name`[c(1:5)])
-  #KeyFeats <- c("age", "asa3","cardiacrisk","RespPreop", "spec2")
+  #KeyFeats <- c("age", "asa3","cardiacrisk","RespPreop", "spec2") #ones that came up in analysis
 
   lst2 <-
     sapply(seq_along(KeyFeats), function(j) {
@@ -114,10 +126,6 @@ ParamsModeling <- function(hh, data, Bootstraps, SelectedModels) {
 
   tic()
   FeatureSelectRes <- furrr::future_map(.x = c(1:length(hh)), ~ iter_parallelFinal(.x, data, hh, method, Bootstraps, SelectedModels, seed), future.seed = TRUE)
-  
-  #p <- progressor(along = xs)
-  #FeatureSelectRes <- furrr::future_map(c(1:length(hh)), function(x) ~ iter_parallelFinal(.x, data, hh, method, Bootstraps, SelectedModels, seed), future.seed = TRUE)
-  
   toc()
 
   return(FeatureSelectRes)
@@ -129,8 +137,13 @@ save(
   file = paste0("ExternalParams.RData")
 )
 
-## ---------------------Pipeline --------------------------------------------------------------------------------
-
+###########################################################################
+###########################################################################
+### ###
+### SECTION 3: DRAKE PIPELINE ###
+### ###
+###########################################################################
+###########################################################################
 
 simple_plan <- drake_plan(
   data1 = target(readxl::read_xlsx(file_in("CovidSurgData.xlsx"))), #######change this
@@ -170,26 +183,35 @@ make(simple_plan) #https://github.com/rstudio/gt/issues/297 - appeared when sour
 toc()
 
 
-
 ## ---------------------End --------------------------------------------------------------------------------
+## -----------------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------------------------------------
+## -----------------------------------------------------------------------------------------------------
+
+
+
+
+
 
 ## ---------------------Run with finalized results and send to folder --------------------------------------------------------------------------------
 
-#Repeat until happy and then send to folder
-toMatch <- c(".csv", ".pdf", ".RData", ".html",".docx",".RDS")
-matches <- unique (grep(paste(toMatch,collapse="|"), 
-                        list.files("/Users/lxb732/Desktop/ParallelizeCOVIDPipelineNoSlurm/DrakePipeline15Jan"), value=TRUE))
+#Repeat until happy and then send to folder (NameRun) (uncomment below)
 
-NameRun <- "GitResults"
-subDir <- paste0(sub("\\..*", "", NameRun), format(Sys.time(), "_%Y%m%d_%H%M"))
-dir.create(file.path(subDir))
-
-file.copy(from= WorkingDir, to= file.path(subDir), 
-          overwrite = TRUE, recursive = FALSE, 
-          copy.mode = TRUE)
-
-file.copy(file.path(WorkingDir,matches), file.path(subDir))
-file.remove(matches)
-
+#
+#toMatch <- c(".csv", ".pdf", ".RData", ".html",".docx",".RDS")
+#matches <- unique (grep(paste(toMatch,collapse="|"), 
+#                        list.files("/Users/lxb732/Desktop/ParallelizeCOVIDPipelineNoSlurm/DrakePipeline15Jan"), value=TRUE))
+#
+#NameRun <- "GitResults" 
+#subDir <- paste0(sub("\\..*", "", NameRun), format(Sys.time(), "_%Y%m%d_%H%M"))
+#dir.create(file.path(subDir))
+#
+#file.copy(from= WorkingDir, to= file.path(subDir), 
+#          overwrite = TRUE, recursive = FALSE, 
+#          copy.mode = TRUE)
+#
+#file.copy(file.path(WorkingDir,matches), file.path(subDir))
+#file.remove(matches)
+#
 
 
