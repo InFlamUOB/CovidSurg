@@ -64,8 +64,8 @@ source(paste0(WorkingDir,"/CovidSurgAUC.R"))
 ###########################################################################
 
 
-# These are the three parameteres (Bootstrapsm SelectedModels, ChosenRun) that you can change - with this set up 5 mins computation. Also hh in line 102 can be changed. The
-# reported analysis had the following specifications (ran in HPC - Bootstraps: 100, SelectedModels: 1,2,3, ChosenRun: 21, line 102 commented (hh) )
+# These are the three parameteres (Bootstrapsm SelectedModels, ChosenRun) that you can change - with this set up 14 mins computation. Also hh in line 102 can be changed. The
+# analysis reported in the paper followed same code but was adapted for slurm and HPC - specifications were - Bootstraps: 100, SelectedModels: 1,2,3, ChosenRun: 21, line 102 commented (hh) )
 
 Bootstraps <- 2
 
@@ -77,7 +77,7 @@ Bootstraps <- 2
 # 4 -bt
 # 5 - dtR
 #SelectedModels <- c(1, 2, 3)
-SelectedModels <- c(1,2,3)
+SelectedModels <- c(1,3)
 
 ChosenRun <- 12 #this is the run with the final model 
 

@@ -73,12 +73,12 @@ HeatmapPlots <- function(IPP, PlotsNames) {
     facet_grid(NumVars ~ b, scales = "free", space = "free") +
     theme_linedraw() +
     theme(
-      axis.text = element_text(size = 5),
+      axis.text = element_text(size = 8),
       panel.grid.major = element_blank(),
       # panel.grid.minor = element_blank(),
       strip.background = element_rect(fill = "grey"),
-      strip.text = element_text(size = 4, colour = "black"),
-      legend.text = element_text(size = 5)
+      strip.text = element_text(size = 8, colour = "black"),
+      legend.text = element_text(size = 7)
     ) +
     scale_x_discrete(expand = c(0, 0)) +
     scale_y_discrete(expand = c(0, 0), labels = c()) +
@@ -104,7 +104,7 @@ HeatmapPlots <- function(IPP, PlotsNames) {
     print("yei")
   
 
-  pdf("ModelsPlotFSRF.pdf", 6, 7)
+  pdf("ModelsPlotFSRF.pdf", 10, 7)
 
  print( ggplot(pp1, aes(reorder(New, Mean), b)) +
     geom_tile(aes(fill = Mean), colour = "black", width = 1, height = 0.001) +
@@ -137,7 +137,7 @@ HeatmapPlots <- function(IPP, PlotsNames) {
   if (dim(pp1)[1] != 0){
     print("yei")
   
-  pdf("ModelsPlotFSDT.pdf", 6, 7)
+  pdf("ModelsPlotFSDT.pdf", 10, 7)
 
  print( ggplot(pp1, aes(reorder(New, Mean), b)) +
     geom_tile(aes(fill = Mean), colour = "black", width = 1, height = 0.001) +

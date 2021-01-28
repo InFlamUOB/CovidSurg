@@ -139,7 +139,7 @@ table(dataPercent$month, useNA = "ifany")
     ) %>%
     select(-c(
       record_id,
-      redcap_data_access_group,
+      #redcap_data_access_group,
       # crp,
       starts_with("anaes"),
       starts_with("respsupport"),
@@ -571,10 +571,10 @@ dev.off()
 
 ColoursMort 
 
-qqVal %>%
+qqVal[c(1,2,5,6),] %>%
   kable(., digits = 2, format.args = list(scientific = FALSE))
 
-qqDerv %>%
+qqDerv[c(1,2,5,6),] %>%
   kable(., digits = 2, format.args = list(scientific = FALSE))
 
 ```

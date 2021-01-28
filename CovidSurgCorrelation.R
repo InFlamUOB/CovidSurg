@@ -1,8 +1,6 @@
 # Calculate a pairwise association between all variables in a data-frame. In particular nominal vs nominal with Chi-square, numeric vs numeric with Pearson correlation, and nominal vs numeric with ANOVA.
 # Adopted from https://stackoverflow.com/a/52557631/590437
 
-
-
 library(rcompanion)
 
 mixed_assoc <- function(df, cor_method = "spearman", adjust_cramersv_bias = TRUE) {
