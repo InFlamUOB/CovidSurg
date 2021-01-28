@@ -198,20 +198,20 @@ toc()
 #Repeat until happy and then send to folder (NameRun) (uncomment below)
 
 
-toMatch <- c(".csv", ".pdf", ".RData", ".html",".docx",".RDS")
-matches <- unique (grep(paste(toMatch,collapse="|"), 
-                        list.files("/Users/lxb732/Desktop/ParallelizeCOVIDPipelineNoSlurm/DrakePipeline15Jan"), value=TRUE))
-
-NameRun <- "GitResults" 
-subDir <- paste0(sub("\\..*", "", NameRun), format(Sys.time(), "_%Y%m%d_%H%M"))
-dir.create(file.path(subDir))
-
-file.copy(from= WorkingDir, to= file.path(subDir), 
-          overwrite = TRUE, recursive = FALSE, 
-          copy.mode = TRUE)
-
-file.copy(file.path(WorkingDir,matches), file.path(subDir))
-file.remove(matches)
-
+#toMatch <- c(".csv", ".pdf", ".RData", ".html",".docx",".RDS")
+#matches <- unique (grep(paste(toMatch,collapse="|"), 
+#                        list.files("/Users/lxb732/Desktop/ParallelizeCOVIDPipelineNoSlurm/DrakePipeline15Jan"), value=TRUE))
+#
+#NameRun <- "GitResults" 
+#subDir <- paste0(sub("\\..*", "", NameRun), format(Sys.time(), "_%Y%m%d_%H%M"))
+#dir.create(file.path(subDir))
+#
+#file.copy(from= WorkingDir, to= file.path(subDir), 
+#          overwrite = TRUE, recursive = FALSE, 
+#          copy.mode = TRUE)
+#
+#file.copy(file.path(WorkingDir,matches), file.path(subDir))
+#file.remove(matches)
+#
 
 
