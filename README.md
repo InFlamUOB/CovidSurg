@@ -6,3 +6,5 @@ Data is available upon reasonable request, and the code contains an Rmarkdown ex
 
 Instructions of use: 
 It is based on the drake R package and so after setting all .R and .Rmd scripts found in the R folder to the same working directory, make sure all packages found in  CovidSurgPackages.R are downloaded and then, just running the main file CovidSurg.R should yield the results. Wth no input parameter changes, all files found in folder ResultFiles are created. For a general overview of the pipeline see CovidSurgReport.html in ResultFiles folder. 
+
+The associated risk calculator app can be found at: https://covidsurgrisk.app/
